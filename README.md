@@ -14,7 +14,7 @@ Phoenix Web App (host)
 ├── WebSocket streaming (real-time bars via Alpaca)
 └── HTTP client → OCaml Analytics
 
-OCaml Analytics Service (Incus container)
+OCaml Analytics Service (Incus or Docker container)
 ├── REST API (Dream framework)
 ├── Financial: volatility, correlation, returns, moving averages, momentum/RSI
 ├── Advanced: Monte Carlo simulation, Bayesian estimation, buy timing
@@ -22,7 +22,7 @@ OCaml Analytics Service (Incus container)
 ├── General: data quality grading, histogram/distribution analysis
 └── 15 POST endpoints + health check
 
-Postgres + TimescaleDB + pg_duckdb (Incus container)
+Postgres + TimescaleDB + pg_duckdb (Incus or Docker container)
 ├── Financial instruments + price bars (hypertable)
 ├── Vehicles + price snapshots (hypertable)
 ├── Users, saved searches, price alerts
@@ -70,17 +70,16 @@ Postgres + TimescaleDB + pg_duckdb (Incus container)
 | Database | Postgres 16 + TimescaleDB + pg_duckdb |
 | Market data | Alpaca Markets (alpa_ex SDK) |
 | Search | Brave Search API |
-| Jobs | Oban |
-| Containers | Incus |
+| Jobs | Oban (Asynchronously decoupled workers) |
+| Containers | Incus / Docker (for macOS/cross-platform) |
 
 ## Quick Start
 
 ```bash
-# Provision containers and start everything
-just up
-./scripts/dev.sh
+# Provision containers and start everything (auto-detects Docker/Incus)
+bash scripts/dev.sh
 
-# Or step by step
+# Or step by step via justfile tasks (auto-fallbacks to Docker if Incus is missing)
 just pg-up              # Postgres + TimescaleDB
 just ocaml-up           # OCaml analytics service
 just ocaml-deploy       # Push + build analytics
