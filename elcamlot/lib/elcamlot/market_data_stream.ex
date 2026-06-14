@@ -71,14 +71,11 @@ defmodule Elcamlot.MarketDataStream do
 
   @impl true
   def handle_cast({:bar_event, %{type: :bar, data: bar}}, state) do
-    case store_bar(bar) do
-      :ok ->
-        {:noreply, %{state | bars_received: state.bars_received + 1}}
+    Task.Supervisor.async_nolink(Elcamlot.TaskSupervisor, fn ->
+      store_bar(bar)
+    end)
 
-      {:error, reason} ->
-        Logger.warning("MarketDataStream: Failed to store bar for #{bar.symbol}: #{inspect(reason)}")
-        {:noreply, state}
-    end
+    {:noreply, %{state | bars_received: state.bars_received + 1}}
   end
 
   def handle_cast({:bar_event, _other}, state) do
@@ -100,7 +97,7 @@ defmodule Elcamlot.MarketDataStream do
       nil ->
         case Markets.upsert_instrument(%{symbol: symbol, asset_class: "us_equity"}) do
           {:ok, instrument} -> do_upsert(bar, instrument.id)
-          {:error, reason} -> {:error, reason}
+          {:error, reason} -> Logger.warning("MarketDataStream: Failed to upsert instrument #{symbol}: #{inspect(reason)}")
         end
 
       instrument ->
@@ -110,8 +107,11 @@ defmodule Elcamlot.MarketDataStream do
 
   defp do_upsert(bar, instrument_id) do
     row = Alpaca.bar_to_row(bar, instrument_id, @timeframe)
-    Markets.upsert_bars([row])
-    :ok
+    
+    case Markets.upsert_bars([row]) do
+      {_count, nil} -> :ok
+      other -> Logger.warning("MarketDataStream: Upsert bar result: #{inspect(other)}")
+    end
   end
 
   defp api_key, do: Application.get_env(:elcamlot, :alpaca_api_key, System.get_env("APCA_API_KEY_ID", ""))

@@ -19,3 +19,10 @@
 * **Problem**: When mounting `DashboardLive`, five sequential HTTP calls to the external OCaml service were executed synchronously. This blocked rendering, causing slow visual load times and potential process starvation if the analytics service lagged.
 * **Solution**: Offloaded the calls into parallel asynchronous execution tasks (`Task.async/1`) inside `start_async_analytics/3` when the socket is connected.
 * **Key Lesson**: Use task messaging (`handle_info/2` matching on the task result tuple) to update LiveView socket assigns as each calculation completes. This decouples user-facing rendering from microservice latency, ensuring instantaneous initial loads and reactive updates.
+
+## 5. Rich Hickey Simplicity Audit & Refactoring
+* **Problem**: System processes suffered from Temporal Coupling and Entanglement. `DealScoreWorker` fetched all data and sequentially called external services in a single massive blocking job. `MarketDataStream` tied network ingestion directly to database writes in the same GenServer process.
+* **Solution**: 
+  - Refactored `DealScoreWorker` into a simple enqueuer that dispatches individual `ScoreVehicleWorker` jobs, separating the "what needs work" from the "doing the work".
+  - Refactored `MarketDataStream` to use `Task.Supervisor.async_nolink` to offload database writes, protecting the WebSocket buffer from DB-induced latency.
+* **Key Lesson**: Embrace Rich Hickey's *Simple Made Easy* by separating concerns across time and space. Do not braid network fetching, pure calculation, and database persistence. Unentangling these processes yields highly resilient, scalable background jobs and streaming ingestion.

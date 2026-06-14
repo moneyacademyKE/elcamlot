@@ -18,6 +18,7 @@ defmodule Elcamlot.Application do
       Elcamlot.BraveSearch.Throttler,
       Elcamlot.MarketStatsRefresher,
       # Real-time market data stream (Alpaca WebSocket)
+      {Task.Supervisor, name: Elcamlot.TaskSupervisor},
       Elcamlot.MarketDataStream,
       # Start to serve requests, typically the last entry
       ElcamlotWeb.Endpoint

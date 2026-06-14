@@ -11,7 +11,7 @@ defmodule Elcamlot.Repo.Migrations.CreateVehiclesAndSnapshots do
       add :year, :integer, null: false
       add :trim, :string
 
-      timestamps(type: :utc_datetime, updated_at: false, inserted_at: :created_at)
+      add :created_at, :utc_datetime, null: false, default: fragment("now()")
     end
 
     create_if_not_exists(unique_index(:vehicles, [:make, :model, :year, :trim]))
@@ -38,7 +38,7 @@ defmodule Elcamlot.Repo.Migrations.CreateVehiclesAndSnapshots do
       add :query, :text, null: false
       add :filters, :map
       add :result_count, :integer
-      add :searched_at, :utc_datetime
+      add :searched_at, :utc_datetime, default: fragment("now()")
     end
   end
 

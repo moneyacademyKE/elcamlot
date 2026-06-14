@@ -9,6 +9,7 @@ defmodule Elcamlot.Repo.Migrations.AddPriceSnapshotDedupIndex do
     WHERE a.ctid > b.ctid
       AND a.vehicle_id = b.vehicle_id
       AND a.url = b.url
+      AND a.price_cents = b.price_cents
       AND a.time = b.time
     """)
 
@@ -16,6 +17,7 @@ defmodule Elcamlot.Repo.Migrations.AddPriceSnapshotDedupIndex do
     create unique_index(:price_snapshots, [
       :vehicle_id,
       :url,
+      :price_cents,
       :time
     ], name: :price_snapshots_vehicle_url_time_idx)
   end

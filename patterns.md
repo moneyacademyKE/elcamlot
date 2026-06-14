@@ -20,3 +20,9 @@ Instead of blocking Phoenix LiveView `mount/3` or `handle_info/2` on slow third-
 * **Trigger**: Check `connected?(socket)` and fire parallel `Task.async/1` executions mapping results to identifier keys (e.g. `{:depreciation, value}`).
 * **Resolution**: Handle messages in `handle_info/2` matching on the task's return value.
 * **Benefits**: Decouples network/external computational latency from page rendering, improving responsiveness and overall page weight loading speed.
+
+## 4. Job Delegation Pattern (Rich Hickey Simplicity)
+Instead of processing a massive batch of work in a single synchronous worker job:
+* **Pattern**: Create an Enqueuer Job that purely queries for the list of targets and enqueues individual Worker Jobs for each target using Oban's `insert_all`.
+* **Execution**: The discrete Worker Jobs (`ScoreVehicleWorker`) perform the fetching, pure computation, and persistence for exactly one entity.
+* **Benefits**: Decouples search from execution. Prevents a single external API timeout from failing the entire batch. Maximizes throughput via isolated, independent job retry states.
