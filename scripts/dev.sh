@@ -23,8 +23,15 @@ echo "==> Setting up OCaml analytics..."
 bash "${PROJECT_ROOT}/infra/setup-ocaml.sh"
 
 # Get container IPs
-PG_IP=$(incus list elcamlot-pg --format csv -c 4 | cut -d' ' -f1)
-OCAML_IP=$(incus list elcamlot-ocaml --format csv -c 4 | cut -d' ' -f1)
+if command -v incus &> /dev/null; then
+  PG_IP=$(incus list elcamlot-pg --format csv -c 4 | cut -d' ' -f1)
+  OCAML_IP=$(incus list elcamlot-ocaml --format csv -c 4 | cut -d' ' -f1)
+else
+  PG_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' elcamlot-pg)
+  OCAML_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' elcamlot-ocaml)
+  if [ -z "${PG_IP}" ]; then PG_IP="127.0.0.1"; fi
+  if [ -z "${OCAML_IP}" ]; then OCAML_IP="127.0.0.1"; fi
+fi
 
 echo ""
 echo "==> Dev environment ready!"

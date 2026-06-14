@@ -133,10 +133,12 @@ defmodule Elcamlot.Vehicles do
 
     case Ecto.Adapters.SQL.query(Repo, query, [vehicle_id]) do
       {:ok, %{columns: columns, rows: [row]}} ->
-        Enum.zip(columns, row) |> Map.new()
+        Enum.zip(columns, row)
+        |> Enum.map(fn {k, v} -> {String.to_atom(k), v} end)
+        |> Map.new()
 
       _ ->
-        %{"count" => 0, "avg_price" => nil, "min_price" => nil, "max_price" => nil}
+        %{count: 0, avg_price: nil, min_price: nil, max_price: nil}
     end
   end
 

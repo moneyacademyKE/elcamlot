@@ -8,6 +8,49 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "==> Setting up Postgres container: ${CONTAINER_NAME}"
 
 # Check if container already exists
+if ! command -v incus &> /dev/null; then
+  echo "==> incus not found, falling back to docker..."
+  if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Container ${CONTAINER_NAME} already exists."
+    state=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}")
+    if [ "$state" != "running" ]; then
+      echo "Starting existing container..."
+      docker start "${CONTAINER_NAME}"
+    fi
+  else
+    echo "==> Launching container from timescale/timescaledb:latest-pg16..."
+    docker run -d \
+      --name "${CONTAINER_NAME}" \
+      -p 5432:5432 \
+      -e POSTGRES_DB=elcamlot \
+      -e POSTGRES_USER=elcamlot \
+      -e POSTGRES_PASSWORD="${PG_PASSWORD:-elcamlot}" \
+      timescale/timescaledb:latest-pg16
+  fi
+
+  echo "==> Waiting for Postgres to start..."
+  for i in $(seq 1 30); do
+    if docker exec "${CONTAINER_NAME}" pg_isready -U elcamlot &>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+
+  # Check if schema is loaded
+  if ! docker exec "${CONTAINER_NAME}" psql -U elcamlot -d elcamlot -c "SELECT 1 FROM vehicles LIMIT 1;" &>/dev/null; then
+    echo "==> Loading schema..."
+    docker cp "${SCRIPT_DIR}/pg-init.sql" "${CONTAINER_NAME}:/tmp/pg-init.sql"
+    docker exec "${CONTAINER_NAME}" psql -U elcamlot -d elcamlot -f /tmp/pg-init.sql
+  fi
+
+  PG_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${CONTAINER_NAME}")
+  if [ -z "$PG_IP" ]; then
+    PG_IP="127.0.0.1"
+  fi
+  echo "==> Postgres container ready! IP: ${PG_IP}"
+  exit 0
+fi
+
 if incus info "${CONTAINER_NAME}" &>/dev/null; then
   echo "Container ${CONTAINER_NAME} already exists."
   state=$(incus info "${CONTAINER_NAME}" | grep "Status:" | awk '{print $2}')

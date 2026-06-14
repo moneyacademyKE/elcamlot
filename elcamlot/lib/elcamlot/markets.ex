@@ -83,7 +83,9 @@ defmodule Elcamlot.Markets do
 
     case Repo.query(query, [instrument_id, timeframe]) do
       {:ok, %{rows: [row], columns: cols}} ->
-        Enum.zip(cols, row) |> Map.new()
+        Enum.zip(cols, row)
+        |> Enum.map(fn {k, v} -> {String.to_atom(k), v} end)
+        |> Map.new()
 
       _ ->
         %{}

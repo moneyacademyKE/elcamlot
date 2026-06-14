@@ -10,34 +10,26 @@ defmodule ElcamlotWeb.DashboardLive do
     snapshots = Vehicles.list_price_snapshots(vehicle.id)
     stats = Vehicles.price_stats(vehicle.id)
 
-    prices = Enum.map(snapshots, & &1.price_cents)
-    depreciation = fetch_depreciation(snapshots)
-    market_position = fetch_market_position(vehicle.id)
-    deal_scores = fetch_deal_scores(snapshots, vehicle.id)
-    data_quality = fetch_data_quality(prices)
-    outliers = fetch_outliers(prices)
     dom_stats = Vehicles.days_on_market_stats(vehicle.id)
     score_history = Vehicles.deal_score_history(vehicle.id)
     latest_score = Vehicles.latest_deal_score(vehicle.id)
     score_trend = compute_score_trend(score_history)
 
-    {:ok,
-     socket
-     |> assign(:vehicle, vehicle)
-     |> assign(:snapshots, snapshots)
-     |> assign(:stats, stats)
-     |> assign(:depreciation, depreciation)
-     |> assign(:market_position, market_position)
-     |> assign(:deal_scores, deal_scores)
-     |> assign(:data_quality, data_quality)
-     |> assign(:outliers, outliers)
-     |> assign(:dom_stats, dom_stats)
-     |> assign(:score_history, score_history)
-     |> assign(:latest_score, latest_score)
-     |> assign(:score_trend, score_trend)
-     |> assign(:searching, false)
-     |> assign(:share_link, nil)
-     |> assign(:alert_form, to_form(%{"target_price" => "", "alert_type" => "below"}))}
+    socket =
+      socket
+      |> assign(:vehicle, vehicle)
+      |> assign(:snapshots, snapshots)
+      |> assign(:stats, stats)
+      |> assign(:dom_stats, dom_stats)
+      |> assign(:score_history, score_history)
+      |> assign(:latest_score, latest_score)
+      |> assign(:score_trend, score_trend)
+      |> assign(:searching, false)
+      |> assign(:share_link, nil)
+      |> assign(:alert_form, to_form(%{"target_price" => "", "alert_type" => "below"}))
+      |> start_async_analytics(vehicle.id, snapshots)
+
+    {:ok, socket}
   end
 
   @impl true
@@ -103,32 +95,26 @@ defmodule ElcamlotWeb.DashboardLive do
 
         snapshots = Vehicles.list_price_snapshots(vehicle.id)
         stats = Vehicles.price_stats(vehicle.id)
-        prices = Enum.map(snapshots, & &1.price_cents)
-        depreciation = fetch_depreciation(snapshots)
-        deal_scores = fetch_deal_scores(snapshots, vehicle.id)
-        data_quality = fetch_data_quality(prices)
-        outliers = fetch_outliers(prices)
         dom_stats = Vehicles.days_on_market_stats(vehicle.id)
         score_history = Vehicles.deal_score_history(vehicle.id)
         latest_score = Vehicles.latest_deal_score(vehicle.id)
         score_trend = compute_score_trend(score_history)
 
-        {:noreply,
-         socket
-         |> assign(
-           snapshots: snapshots,
-           stats: stats,
-           depreciation: depreciation,
-           deal_scores: deal_scores,
-           data_quality: data_quality,
-           outliers: outliers,
-           dom_stats: dom_stats,
-           score_history: score_history,
-           latest_score: latest_score,
-           score_trend: score_trend,
-           searching: false
-         )
-         |> put_flash(:info, "Added #{length(results)} price points")}
+        socket =
+          socket
+          |> assign(
+            snapshots: snapshots,
+            stats: stats,
+            dom_stats: dom_stats,
+            score_history: score_history,
+            latest_score: latest_score,
+            score_trend: score_trend,
+            searching: false
+          )
+          |> start_async_analytics(vehicle.id, snapshots)
+          |> put_flash(:info, "Added #{length(results)} price points")
+
+        {:noreply, socket}
 
       {:error, reason} ->
         {:noreply,
@@ -136,6 +122,33 @@ defmodule ElcamlotWeb.DashboardLive do
          |> assign(searching: false)
          |> put_flash(:error, "Search failed: #{inspect(reason)}")}
     end
+  end
+
+  @impl true
+  def handle_info({_task_ref, {key, value}}, socket) when key in [:depreciation, :market_position, :deal_scores, :data_quality, :outliers] do
+    {:noreply, assign(socket, key, value)}
+  end
+
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, socket) do
+    {:noreply, socket}
+  end
+
+  defp start_async_analytics(socket, vehicle_id, snapshots) do
+    if connected?(socket) do
+      prices = Enum.map(snapshots, & &1.price_cents)
+      Task.async(fn -> {:depreciation, fetch_depreciation(snapshots)} end)
+      Task.async(fn -> {:market_position, fetch_market_position(vehicle_id)} end)
+      Task.async(fn -> {:deal_scores, fetch_deal_scores(snapshots, vehicle_id)} end)
+      Task.async(fn -> {:data_quality, fetch_data_quality(prices)} end)
+      Task.async(fn -> {:outliers, fetch_outliers(prices)} end)
+    end
+
+    socket
+    |> assign(:depreciation, nil)
+    |> assign(:market_position, nil)
+    |> assign(:deal_scores, %{})
+    |> assign(:data_quality, nil)
+    |> assign(:outliers, nil)
   end
 
   defp fetch_market_position(vehicle_id) do

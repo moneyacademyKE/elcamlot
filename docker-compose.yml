@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: elcamlot-pg
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=elcamlot
+      - POSTGRES_USER=elcamlot
+      - POSTGRES_PASSWORD=elcamlot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/pg-init.sql:/docker-entrypoint-initdb.d/pg-init.sql
+
+  analytics:
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    container_name: elcamlot-ocaml
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:

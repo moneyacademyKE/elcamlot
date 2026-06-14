@@ -9,6 +9,32 @@ PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
 echo "==> Setting up OCaml analytics container: ${CONTAINER_NAME}"
 
 # Check if container already exists
+if ! command -v incus &> /dev/null; then
+  echo "==> incus not found, falling back to docker..."
+  if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Container ${CONTAINER_NAME} already exists."
+    state=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}")
+    if [ "$state" != "running" ]; then
+      echo "Starting existing container..."
+      docker start "${CONTAINER_NAME}"
+    fi
+  else
+    echo "==> Building and launching OCaml container..."
+    docker build -t elcamlot-ocaml-img "${PROJECT_ROOT}/analytics"
+    docker run -d \
+      --name "${CONTAINER_NAME}" \
+      -p 8080:8080 \
+      elcamlot-ocaml-img
+  fi
+
+  OCAML_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${CONTAINER_NAME}")
+  if [ -z "$OCAML_IP" ]; then
+    OCAML_IP="127.0.0.1"
+  fi
+  echo "==> OCaml analytics container ready! IP: ${OCAML_IP}"
+  exit 0
+fi
+
 if incus info "${CONTAINER_NAME}" &>/dev/null; then
   echo "Container ${CONTAINER_NAME} already exists."
   state=$(incus info "${CONTAINER_NAME}" | grep "Status:" | awk '{print $2}')
